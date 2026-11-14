@@ -22,14 +22,16 @@ public class SistemaPeluqueria {
                     case 4 -> procesarSiguiente();
                     case 5 -> verHistorial();
                     case 6 -> buscarPorTurno();
-                    case 7 -> System.out.println("Funcionalidad en construcción...");
-                    case 8 -> System.out.println("Funcionalidad en construcción...");
+                    case 7 -> cancelarPendiente();
+                    case 8 -> deshacerUltimoProcesamiento();
                     case 9 -> verCantidadElementos();
                     case 10 -> System.out.println("Saliendo del sistema de gestión de peluquería. ¡Hasta pronto!");
                     default -> System.out.println("Opción no válida. Ingrese un número entre 1 y 10.");
                 }
             } catch (NumberFormatException e) {
                 System.out.println("Error: Debe ingresar un número entero válido.");
+            } catch (Exception e) {
+                System.out.println("Ocurrió un error inesperado: " + e.getMessage());
             }
         } while (opcion != 10);
     }
@@ -62,7 +64,6 @@ public class SistemaPeluqueria {
             return;
         }
 
-        // Validar que el turno no exista previamente en la lista general
         if (listaGeneral.contiene(new ClienteServicio(turno))) {
             System.out.println("Error: Ya existe un registro con el turno " + turno + ".");
             return;
@@ -82,7 +83,6 @@ public class SistemaPeluqueria {
 
         ClienteServicio nuevoCliente = new ClienteServicio(turno, nombre, servicio, estilista, "En espera");
 
-        // Regla obligatoria de registro
         listaGeneral.agregar(nuevoCliente);
         colaPendientes.encolar(nuevoCliente);
 
@@ -109,7 +109,6 @@ public class SistemaPeluqueria {
             return;
         }
 
-        // Regla obligatoria de procesamiento[cite: 8]
         ClienteServicio procesado = (ClienteServicio) colaPendientes.desencolar();
         procesado.setEstado("Atendido");
         historialProcesados.apilar(procesado);
@@ -135,6 +134,57 @@ public class SistemaPeluqueria {
         } else {
             System.out.println("No se encontró ningún cliente con el turno " + turno + ".");
         }
+    }
+
+    // 7. Cancelar turno pendiente usando una Cola Auxiliar (sin romper FIFO)
+    private static void cancelarPendiente() {
+        System.out.println("\n--- CANCELAR TURNO PENDIENTE ---");
+        if (colaPendientes.esVacia()) {
+            System.out.println("No hay turnos pendientes para cancelar.");
+            return;
+        }
+
+        System.out.print("Ingrese el número de turno pendiente a cancelar: ");
+        String turno = scanner.nextLine().trim().toUpperCase();
+
+        Cola colaAuxiliar = new Cola();
+        boolean encontrado = false;
+
+        while (!colaPendientes.esVacia()) {
+            ClienteServicio actual = (ClienteServicio) colaPendientes.desencolar();
+            if (actual.getNumeroTurno().equalsIgnoreCase(turno)) {
+                actual.setEstado("Cancelado");
+                encontrado = true;
+                System.out.println("Turno cancelado exitosamente: " + actual);
+            } else {
+                colaAuxiliar.encolar(actual);
+            }
+        }
+
+        // Restaurar los elementos restantes manteniendo el orden de llegada original
+        while (!colaAuxiliar.esVacia()) {
+            colaPendientes.encolar(colaAuxiliar.desencolar());
+        }
+
+        if (!encontrado) {
+            System.out.println("El turno " + turno + " no se encuentra en la cola de pendientes (puede que ya haya sido atendido o no exista).");
+        }
+    }
+
+    // 8. Deshacer último procesamiento (LIFO -> FIFO)
+    private static void deshacerUltimoProcesamiento() {
+        System.out.println("\n--- DESHACER ÚLTIMO PROCESAMIENTO ---");
+        if (historialProcesados.esVacia()) {
+            System.out.println("No hay atenciones recientes en el historial para deshacer.");
+            return;
+        }
+
+        // Regla obligatoria de deshacer[cite: 8]
+        ClienteServicio ultimo = (ClienteServicio) historialProcesados.desapilar();
+        ultimo.setEstado("En espera (Reingresado)");
+        colaPendientes.encolar(ultimo);
+
+        System.out.println("Se deshizo la atención del turno. El cliente volvió a la cola de espera: " + ultimo);
     }
 
     // 9. Reporte de cantidades
